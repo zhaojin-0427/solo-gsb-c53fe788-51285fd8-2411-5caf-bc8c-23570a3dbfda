@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: lab
+      POSTGRES_PASSWORD: lab
+      POSTGRES_DB: lab_planning
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lab -d lab_planning"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://lab:lab@postgres:5432/lab_planning
+      SOLVER_TIME_LIMIT_SECONDS: 5
+      # Concurrent same-key requests wait up to this long for the first
+      # request; a crashed in_progress marker may be retaken after the stale
+      # timeout.  Override via a .env file or the shell environment.
+      IDEMPOTENT_LOCK_TIMEOUT_SECONDS: ${IDEMPOTENT_LOCK_TIMEOUT_SECONDS:-30}
+      IDEMPOTENT_STALE_TIMEOUT_SECONDS: ${IDEMPOTENT_STALE_TIMEOUT_SECONDS:-120}
+    ports:
+      - "8000:8000"
+
+volumes:
+  postgres_data:
